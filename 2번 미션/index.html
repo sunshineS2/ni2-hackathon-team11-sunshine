@@ -146,6 +146,10 @@
   .issue { background: var(--card); border-color: #777; }
   .toast { background: var(--primary); }
   .notice.storage-alert { border: 3px solid var(--bad); }
+  /* 조건부 완료: 초록 테두리만(채움 없음) + 글자로 구분 */
+  .seg button[aria-pressed="true"][data-v="done"].cond { background: var(--card); color: var(--ok); font-weight: 700; outline: 2px solid var(--ok); outline-offset: -4px; }
+  .pill.cond { background: var(--card); color: var(--ok); border: 1px solid var(--ok); }
+  .cond-note { margin-top: 6px; font-size: 13px; color: var(--ok); font-weight: 600; }
 
   @media (max-width: 700px) {
     body { font-size: 15px; }
@@ -231,7 +235,7 @@
       <h2>진행 현황</h2>
       <div class="stats">
         <div class="stat"><b id="stPct">0%</b><span>전체 진행률</span></div>
-        <div class="stat"><b id="stDone">0/0</b><span>완료·해당 없음</span></div>
+        <div class="stat"><b id="stDone">0/0</b><span id="stDoneLabel">완료·해당 없음</span></div>
         <div class="stat"><b id="stHold">0</b><span>보류</span></div>
         <div class="stat bad"><b id="stOut">0</b><span>기준 이탈 측정값</span></div>
       </div>
@@ -438,21 +442,26 @@
   const verdictClass = j => (j === 'out' || j === 'invalid') ? 'bad' : j === 'ok' ? 'ok' : '';
   const itemDef = (c, itemId) => tpl(c).stages.flatMap(s => s.items).find(i => i.id === itemId);
 
+  // 조건부 완료(B): 측정 항목이 기준 이탈이거나 측정값이 비어 있는데 완료한 경우. 사유 메모 필수, 진행률에서 제외
+  const needsReason = (it, r) => it.type === 'measure' && ['out', null].includes(judge(it, r.value));
+  const isConditional = (it, r) => r.status === 'done' && needsReason(it, r);
+
   function compute(c) {
     const t = tpl(c);
-    let total = 0, done = 0, hold = 0, out = 0;
+    let total = 0, done = 0, hold = 0, out = 0, cond = 0;
     const stages = t.stages.map(st => {
-      let sDone = 0, sOut = 0;
+      let sDone = 0, sOut = 0, sCond = 0;
       st.items.forEach(it => {
         total++;
         const r = rec(c, it.id);
-        if (r.status === 'done' || r.status === 'na') { done++; sDone++; }
+        if (isConditional(it, r)) { cond++; sCond++; }
+        else if (r.status === 'done' || r.status === 'na') { done++; sDone++; }
         if (r.status === 'hold') hold++;
         if (judge(it, r.value) === 'out') { out++; sOut++; }
       });
-      return { id: st.id, name: st.name, total: st.items.length, done: sDone, out: sOut };
+      return { id: st.id, name: st.name, total: st.items.length, done: sDone, out: sOut, cond: sCond };
     });
-    return { total, done, hold, out, pct: total ? Math.round(done / total * 100) : 0, stages };
+    return { total, done, hold, out, cond, pct: total ? Math.round(done / total * 100) : 0, stages };
   }
 
   // ---------- 렌더링: 기능 1 ----------
@@ -487,17 +496,18 @@
     $('#topBar').style.width = p.pct + '%';
     $('#stPct').textContent = p.pct + '%';
     $('#stDone').textContent = `${p.done}/${p.total}`;
+    $('#stDoneLabel').textContent = p.cond ? `완료·해당 없음 (조건부 ${p.cond} 별도)` : '완료·해당 없음';
     $('#stHold').textContent = p.hold;
     $('#stOut').textContent = p.out;
     $('#stageProg').innerHTML = p.stages.map(s =>
-      `<div class="${s.done === s.total ? 'done' : ''} ${s.out ? 'has-bad' : ''}"><span>${esc(s.name)}</span><b>${s.done}/${s.total}${s.out ? ` <span class="pill bad">이탈 ${s.out}</span>` : ''}</b></div>`
+      `<div class="${s.done === s.total ? 'done' : ''} ${s.out ? 'has-bad' : ''}"><span>${esc(s.name)}</span><b>${s.done}/${s.total}${s.cond ? ` <span class="pill cond">조건부 ${s.cond}</span>` : ''}${s.out ? ` <span class="pill bad">이탈 ${s.out}</span>` : ''}</b></div>`
     ).join('');
     // 단계 헤더 배지 갱신
     p.stages.forEach(s => {
       const b = document.querySelector(`[data-stage-badge="${s.id}"]`);
       if (b) {
         b.className = 'pill ' + (s.out ? 'bad' : s.done === s.total ? 'ok' : '');
-        b.textContent = `${s.done}/${s.total}${s.out ? ' · 이탈 ' + s.out : ''}`;
+        b.textContent = `${s.done}/${s.total}${s.cond ? ' · 조건부 ' + s.cond : ''}${s.out ? ' · 이탈 ' + s.out : ''}`;
       }
     });
   }
@@ -505,8 +515,9 @@
   function itemHTML(c, it) {
     const r = rec(c, it.id);
     const j = judge(it, r.value);
+    const cond = isConditional(it, r);
     const seg = ['done', 'hold', 'na'].map(v =>
-      `<button type="button" data-act="status" data-v="${v}" aria-pressed="${r.status === v}">${STATUS_LABEL[v]}</button>`).join('');
+      `<button type="button" data-act="status" data-v="${v}" aria-pressed="${r.status === v}" class="${v === 'done' && cond ? 'cond' : ''}">${v === 'done' && cond ? '조건부 완료' : STATUS_LABEL[v]}</button>`).join('');
     const meas = it.type === 'measure' ? `
       <div class="meas">
         <input type="text" inputmode="${(it.min < 0 || it.max < 0) ? 'text' : 'decimal'}" autocomplete="off" spellcheck="false" data-act="value" value="${esc(r.value)}" placeholder="측정값" aria-label="${esc(it.name)} 측정값">
@@ -527,6 +538,7 @@
           <span class="item-title">${esc(it.name)}</span>
           <span class="pill">${it.type === 'measure' ? '측정값' : '체크'}</span>
         </div>
+        ${cond ? `<div class="cond-note">조건부 완료: ${judge(it, r.value) === 'out' ? '기준 이탈' : '측정값 없음'} 상태로 완료했어요. 진행률에는 포함되지 않고 요약에 따로 표시돼요.</div>` : ''}
         <div class="seg" role="group" aria-label="상태">${seg}</div>
         ${meas}
         <textarea rows="2" data-act="memo" placeholder="메모 (보류 사유, 특이사항 등)">${esc(r.memo)}</textarea>
@@ -565,12 +577,13 @@
   // ---------- 기능 2: 인수인계 요약 생성 ----------
   function buildSummary(c) {
     const t = tpl(c); const p = compute(c);
-    const completed = [], pending = [], openIssues = [], outs = [], invalids = [];
+    const completed = [], conditional = [], pending = [], openIssues = [], outs = [], invalids = [];
     t.stages.forEach(st => st.items.forEach(it => {
       const r = rec(c, it.id); const j = judge(it, r.value);
       const valTxt = j === 'invalid' ? ` (측정값 형식 오류: "${String(r.value).trim()}" → 숫자로 다시 입력 필요)`
         : it.type === 'measure' && j ? ` (측정 ${String(r.value).trim()} ${it.unit}, 기준 ${it.specText}${j === 'out' ? ', 기준 이탈' : ''})` : '';
-      if (r.status === 'done' || r.status === 'na') completed.push({ st, it, r, valTxt, j });
+      if (isConditional(it, r)) conditional.push({ st, it, r, valTxt: valTxt || ' (측정값 없음)', j });
+      else if (r.status === 'done' || r.status === 'na') completed.push({ st, it, r, valTxt, j });
       else pending.push({ st, it, r, valTxt, j });
       if (j === 'out') outs.push({ st, it, r });
       if (j === 'invalid') invalids.push({ st, it, r });
@@ -586,13 +599,16 @@
       push(o.it.id, `[이슈·높음] ${o.st.name} › ${o.it.name}: ${o.is.text}${out ? ` (측정 ${r.value} ${o.it.unit}, 기준 ${o.it.specText} 이탈 → 조치 후 재측정)` : ''}`);
     });
     invalids.forEach(o => push(o.it.id, `[측정값 확인] ${o.st.name} › ${o.it.name}: "${String(o.r.value).trim()}"은 숫자 형식이 아님 → 다시 측정·입력`));
-    outs.forEach(o => push(o.it.id, `[기준 이탈] ${o.st.name} › ${o.it.name}: ${o.r.value} ${o.it.unit} → 원인 확인 후 재측정 (기준 ${o.it.specText})`));
+    outs.forEach(o => push(o.it.id, o.r.status === 'done'
+      ? `[조건부 완료·기준 이탈] ${o.st.name} › ${o.it.name}: ${String(o.r.value).trim()} ${o.it.unit} (기준 ${o.it.specText}, 사유: ${o.r.memo || '미기재'}) → 후속 확인`
+      : `[기준 이탈] ${o.st.name} › ${o.it.name}: ${String(o.r.value).trim()} ${o.it.unit} → 원인 확인 후 재측정 (기준 ${o.it.specText})`));
+    conditional.filter(x => x.j === null).forEach(x => push(x.it.id, `[조건부 완료·측정값 없음] ${x.st.name} › ${x.it.name} (사유: ${x.r.memo || '미기재'}) → 측정 후 기록`));
     pending.filter(x => x.r.status === 'hold').forEach(x => push(x.it.id, `[보류 해소] ${x.st.name} › ${x.it.name}${x.r.memo ? ` (사유: ${x.r.memo})` : ''}`));
     openIssues.filter(o => o.is.sev === 'mid').forEach(o => push(o.it.id, `[이슈·중간] ${o.st.name} › ${o.it.name}: ${o.is.text}`));
     pending.filter(x => x.r.status === '').forEach(x => push(x.it.id, `[이어서 진행] ${x.st.name} › ${x.it.name}`));
     openIssues.filter(o => o.is.sev === 'low').forEach(o => push(o.it.id, `[이슈·낮음] ${o.st.name} › ${o.it.name}: ${o.is.text}`));
 
-    return { c, p, completed, pending, openIssues, outs, next, createdAt: new Date() };
+    return { c, p, completed, conditional, pending, openIssues, outs, next, createdAt: new Date() };
   }
 
   function summaryHTML(s) {
@@ -608,10 +624,13 @@
       <h3>장비 셋업 인수인계 요약</h3>
       <div class="meta">${esc(i.customer || '-')} · ${esc(i.site || '-')} · ${esc(i.model)} · S/N ${esc(i.sn || '-')}</div>
       <div class="meta">인계: ${esc(i.owner || '-')} → 인수: ${esc(i.nextOwner || '-')} · 교대 시작 ${esc(fmtTime(i.shiftStart))}</div>
-      <div class="meta">전체 진행률 <b>${s.p.pct}%</b> (${s.p.done}/${s.p.total}) · 보류 ${s.p.hold} · 기준 이탈 <b class="${s.p.out ? 'redtxt' : ''}">${s.p.out}</b> · 열린 이슈 ${s.openIssues.length}</div>
+      <div class="meta">전체 진행률 <b>${s.p.pct}%</b> (${s.p.done}/${s.p.total}) · 조건부 완료 ${s.p.cond} · 보류 ${s.p.hold} · 기준 이탈 <b class="${s.p.out ? 'redtxt' : ''}">${s.p.out}</b> · 열린 이슈 ${s.openIssues.length}</div>
 
       <h4>✔ 완료된 단계·항목</h4>
       ${completedHTML}
+
+      <h4>△ 조건부 완료 (진행률 제외)</h4>
+      ${li(s.conditional.map(x => `<li><span class="pill cond">조건부</span> ${esc(x.st.name)} › ${esc(x.it.name)}<span class="redtxt">${esc(x.valTxt)}</span> - 사유: ${x.r.memo ? esc(x.r.memo) : '<span class="redtxt">미기재</span>'}</li>`))}
 
       <h4>□ 미완료·보류 항목과 그 이유</h4>
       ${li(s.pending.map(x => `<li><span class="pill ${x.r.status === 'hold' ? 'warn' : ''}">${STATUS_LABEL[x.r.status]}</span> ${esc(x.st.name)} › ${esc(x.it.name)}<span class="${x.j === 'out' || x.j === 'invalid' ? 'redtxt' : ''}">${esc(x.valTxt)}</span>${x.r.memo ? ` - 사유: ${esc(x.r.memo)}` : x.r.status === 'hold' ? ' - 사유: <span class="redtxt">미기재</span>' : ''}</li>`))}
@@ -632,9 +651,11 @@
     L.push('[장비 셋업 인수인계 요약]');
     L.push(`${i.customer || '-'} / ${i.site || '-'} / ${i.model} / S/N ${i.sn || '-'}`);
     L.push(`인계: ${i.owner || '-'} → 인수: ${i.nextOwner || '-'} / 교대 시작 ${fmtTime(i.shiftStart)}`);
-    L.push(`전체 진행률 ${s.p.pct}% (${s.p.done}/${s.p.total}), 보류 ${s.p.hold}, 기준 이탈 ${s.p.out}, 열린 이슈 ${s.openIssues.length}`);
+    L.push(`전체 진행률 ${s.p.pct}% (${s.p.done}/${s.p.total}), 조건부 완료 ${s.p.cond}, 보류 ${s.p.hold}, 기준 이탈 ${s.p.out}, 열린 이슈 ${s.openIssues.length}`);
     L.push('', '■ 완료');
     if (s.completed.length) s.completed.forEach(x => L.push(`- ${x.st.name} > ${x.it.name}${x.r.status === 'na' ? ' (해당 없음)' : ''}${x.valTxt}`)); else L.push('- 없음');
+    L.push('', '■ 조건부 완료 (진행률 제외)');
+    if (s.conditional.length) s.conditional.forEach(x => L.push(`- ${x.st.name} > ${x.it.name}${x.valTxt} / 사유: ${x.r.memo || '미기재'}`)); else L.push('- 없음');
     L.push('', '■ 미완료·보류');
     if (s.pending.length) s.pending.forEach(x => L.push(`- [${STATUS_LABEL[x.r.status]}] ${x.st.name} > ${x.it.name}${x.valTxt}${x.r.memo ? ' / 사유: ' + x.r.memo : ''}`)); else L.push('- 없음');
     L.push('', '■ 열린 이슈 (심각도순)');
@@ -711,6 +732,13 @@
         itemEl.querySelector('[data-act="value"]')?.focus();
         return;
       }
+      if (btn.dataset.v === 'done' && r.status !== 'done' && needsReason(itemDef(c, itemEl.dataset.item), r) && !r.memo.trim()) {
+        const why = judge(itemDef(c, itemEl.dataset.item), r.value) === 'out' ? '기준 이탈' : '측정값이 없는';
+        toast(`${why} 항목은 메모에 사유를 써야 조건부 완료할 수 있어요`);
+        itemEl.querySelector('[data-act="memo"]')?.focus();
+        return;
+      }
+      if (btn.dataset.v === 'done' && r.status !== 'done' && needsReason(itemDef(c, itemEl.dataset.item), r)) toast('조건부 완료로 기록했어요 (진행률에는 포함되지 않아요)');
       r.status = r.status === btn.dataset.v ? '' : btn.dataset.v;
     }
     else if (act === 'addIssue') {
@@ -738,17 +766,34 @@
       const v = itemEl.querySelector('[data-verdict]');
       v.className = 'verdict ' + verdictClass(j);
       v.textContent = verdictText(j);
+      updateCondUI(itemEl, itemDef(c, itemEl.dataset.item), r);
       renderProgress();
     }
   });
+  // 값을 고치는 중에도 조건부/일반 완료 표시를 제자리에서 갱신 (입력 포커스 유지)
+  function updateCondUI(itemEl, it, r) {
+    const cond = isConditional(it, r);
+    const b = itemEl.querySelector('[data-act="status"][data-v="done"]');
+    b.classList.toggle('cond', cond);
+    b.textContent = cond ? '조건부 완료' : STATUS_LABEL.done;
+    let note = itemEl.querySelector('.cond-note');
+    if (cond) {
+      if (!note) { note = document.createElement('div'); note.className = 'cond-note'; itemEl.querySelector('.item-head').after(note); }
+      note.textContent = `조건부 완료: ${judge(it, r.value) === 'out' ? '기준 이탈' : '측정값 없음'} 상태로 완료했어요. 진행률에는 포함되지 않고 요약에 따로 표시돼요.`;
+    } else if (note) note.remove();
+  }
   // 입력을 마친 뒤(칸을 벗어날 때) 형식 오류 값이면 완료를 해제해 진행률과 판정을 맞춤
   stagesEl.addEventListener('change', e => {
-    const el = e.target; if (el.dataset.act !== 'value') return;
+    const el = e.target; if (el.dataset.act !== 'value' && el.dataset.act !== 'memo') return;
     const itemEl = el.closest('[data-item]'); if (!itemEl) return;
-    const c = cur(); const r = rec(c, itemEl.dataset.item);
-    if (r.status === 'done' && judge(itemDef(c, itemEl.dataset.item), r.value) === 'invalid') {
+    const c = cur(); const r = rec(c, itemEl.dataset.item); const it = itemDef(c, itemEl.dataset.item);
+    if (r.status === 'done' && judge(it, r.value) === 'invalid') {
       r.status = ''; save(); renderItem(itemEl.dataset.item); renderProgress();
       toast('측정값이 숫자 형식이 아니라 완료를 해제했어요');
+    } else if (isConditional(it, r) && !r.memo.trim()) {
+      // 조건부 완료인데 사유가 없어지면(메모 삭제, 값이 이탈로 바뀜) 완료 해제
+      r.status = ''; save(); renderItem(itemEl.dataset.item); renderProgress();
+      toast('사유 메모가 없어 조건부 완료를 해제했어요');
     }
   });
 
