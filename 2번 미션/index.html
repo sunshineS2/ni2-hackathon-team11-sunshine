@@ -154,6 +154,27 @@
     .grid { grid-template-columns: 1fr; }
     .stage-prog { grid-template-columns: 1fr; }
   }
+  /* 휴대폰·터치 기기: 장갑을 끼고도 누르기 쉽게 버튼을 크게(최소 48px), 버튼 사이 간격을 넓게.
+     컴퓨터(마우스, 넓은 화면)는 그대로 */
+  @media (max-width: 700px), (pointer: coarse) {
+    input, select, textarea { min-height: 48px; font-size: 16px; } /* 16px: 아이폰에서 입력 시 화면 자동 확대 방지 */
+    .btn, .btn.sm { min-height: 48px; padding: 10px 16px; font-size: 16px; }
+    .btn.big { min-height: 56px; font-size: 17px; }
+    nav.tabs button { min-height: 56px; font-size: 16px; }
+    nav.tabs { gap: 10px; }
+    details.stage > summary, details.info-card > summary { min-height: 56px; }
+    .seg button { min-height: 52px; font-size: 16px; }
+    .row-actions, .case-bar { gap: 12px; }
+    /* 이슈 줄: 버튼을 아래 줄로 내려 넓게, 해결과 삭제 사이를 띄워 잘못 누르지 않게 */
+    .issue { gap: 10px 16px; padding: 10px; }
+    .issue .txt { flex: 1 1 calc(100% - 70px); }
+    .issue .btn { flex: 1 1 0; }
+    .issues { gap: 10px; }
+    .issue-form { gap: 10px; }
+    .issue-form input { flex: 1 1 100%; }
+    .issue-form select { flex: 1 1 0; }
+    .issue-form .btn { flex: 1 1 0; }
+  }
   @media print {
     body { background: #fff; }
     header.top, nav.tabs, .notice, #view-check, .no-print, footer, .toast { display: none !important; }
