@@ -312,11 +312,11 @@
     return {
       id: uid(),
       info: { customer: '샘플팹A', site: '샘플라인1', model: 'OL-SAMPLE', sn: 'SAMPLE-001', owner: 'FSE-1', nextOwner: 'FSE-2', shiftStart: nowLocal() },
-      records: {}
+      recordsByModel: {}
     };
   }
   function blankCase() {
-    return { id: uid(), info: { customer: '', site: '', model: 'OL-SAMPLE', sn: '', owner: '', nextOwner: '', shiftStart: nowLocal() }, records: {} };
+    return { id: uid(), info: { customer: '', site: '', model: 'OL-SAMPLE', sn: '', owner: '', nextOwner: '', shiftStart: nowLocal() }, recordsByModel: {} };
   }
 
   // ---------- 저장/불러오기 ----------
@@ -340,9 +340,21 @@
       const info = {};
       INFO_KEYS.forEach(k => { info[k] = str(ri[k]); if (ri[k] != null && typeof ri[k] !== 'string') fixed = true; });
       if (!TEMPLATES[info.model]) { if (info.model) fixed = true; info.model = 'OL-SAMPLE'; }
+      // 기록은 장비 모델별로 따로 보관 (recordsByModel[모델][항목]). 예전 형식(records)은 현재 모델의 기록으로 옮김
+      const recordsByModel = {};
+      if (isObj(rc.recordsByModel)) Object.entries(rc.recordsByModel).forEach(([m, recs]) => {
+        if (!isObj(recs)) { fixed = true; return; }
+        recordsByModel[m] = normRecords(recs);
+      });
+      else if (rc.recordsByModel != null) fixed = true;
+      if (isObj(rc.records)) recordsByModel[info.model] = { ...normRecords(rc.records), ...(recordsByModel[info.model] || {}) };
+      else if (rc.records != null) fixed = true;
+      if (!('records' in rc) && !('recordsByModel' in rc)) fixed = true;
+      cases.push({ id, info, recordsByModel });
+    });
+    function normRecords(src) {
       const records = {};
-      if (!isObj(rc.records)) { if (rc.records != null || !('records' in rc)) fixed = true; }
-      else Object.entries(rc.records).forEach(([itemId, rr]) => {
+      Object.entries(src).forEach(([itemId, rr]) => {
         if (!isObj(rr)) { fixed = true; return; }
         const status = ['done', 'hold', 'na', ''].includes(rr.status) ? rr.status : (fixed = true, '');
         const issues = (Array.isArray(rr.issues) ? rr.issues : (fixed = true, [])).filter(is => {
@@ -359,8 +371,8 @@
         if (typeof rr.value !== 'string' || typeof rr.memo !== 'string') fixed = fixed || rr.value != null || rr.memo != null;
         records[itemId] = { status, value: str(rr.value), memo: str(rr.memo), issues };
       });
-      cases.push({ id, info, records });
-    });
+      return records;
+    }
     if (!cases.length) return { state: null, fixed: true };
     const currentId = cases.some(c => c.id === raw.currentId) ? raw.currentId : cases[0].id;
     return { state: { cases, currentId }, fixed };
@@ -423,7 +435,14 @@
   }
   const cur = () => state.cases.find(c => c.id === state.currentId);
   const tpl = c => TEMPLATES[c.info.model] || TEMPLATES['OL-SAMPLE'];
-  const rec = (c, itemId) => (c.records[itemId] ||= { status: '', value: '', memo: '', issues: [] });
+  const modelRecs = (c, model = c.info.model) => (c.recordsByModel[model] ||= {});
+  const rec = (c, itemId) => (modelRecs(c)[itemId] ||= { status: '', value: '', memo: '', issues: [] });
+  // 해당 모델에 실제로 남긴 기록(상태·측정값·메모·이슈) 항목 수
+  const countRecords = (c, model) => Object.values(c.recordsByModel[model] || {})
+    .filter(r => r.status || String(r.value).trim() || String(r.memo).trim() || r.issues.length).length;
+  const otherModelRecords = c => Object.keys(c.recordsByModel)
+    .filter(m => m !== c.info.model).map(m => ({ model: m, n: countRecords(c, m) })).filter(x => x.n);
+  const modelLabel = m => TEMPLATES[m] ? m : `${m}(템플릿 없음)`;
 
   // ---------- 판정 ----------
   // 측정값 허용 형식: 부호(-)와 소수점만 (예: 0.55, -80, .3). 지수(1e1), +, 쉼표 등은 형식 오류
@@ -475,6 +494,7 @@
       return `<option value="${c.id}" ${c.id === state.currentId ? 'selected' : ''}>${esc(name)}</option>`;
     }).join('');
     $('#modelSelect').innerHTML = Object.entries(TEMPLATES).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join('');
+    $('#modelSelect').value = cur().info.model; // 목록을 다시 그려도 저장된 모델 선택 유지
   }
 
   function renderInfoLine() {
@@ -608,7 +628,7 @@
     pending.filter(x => x.r.status === '').forEach(x => push(x.it.id, `[이어서 진행] ${x.st.name} › ${x.it.name}`));
     openIssues.filter(o => o.is.sev === 'low').forEach(o => push(o.it.id, `[이슈·낮음] ${o.st.name} › ${o.it.name}: ${o.is.text}`));
 
-    return { c, p, completed, conditional, pending, openIssues, outs, next, createdAt: new Date() };
+    return { c, p, completed, conditional, pending, openIssues, outs, next, others: otherModelRecords(c), createdAt: new Date() };
   }
 
   function summaryHTML(s) {
@@ -625,6 +645,7 @@
       <div class="meta">${esc(i.customer || '-')} · ${esc(i.site || '-')} · ${esc(i.model)} · S/N ${esc(i.sn || '-')}</div>
       <div class="meta">인계: ${esc(i.owner || '-')} → 인수: ${esc(i.nextOwner || '-')} · 교대 시작 ${esc(fmtTime(i.shiftStart))}</div>
       <div class="meta">전체 진행률 <b>${s.p.pct}%</b> (${s.p.done}/${s.p.total}) · 조건부 완료 ${s.p.cond} · 보류 ${s.p.hold} · 기준 이탈 <b class="${s.p.out ? 'redtxt' : ''}">${s.p.out}</b> · 열린 이슈 ${s.openIssues.length}</div>
+      ${s.others.length ? `<div class="meta">※ 다른 모델 기록 보관 중 (이 요약에는 미포함): ${s.others.map(o => `${esc(modelLabel(o.model))} ${o.n}건`).join(', ')}</div>` : ''}
 
       <h4>✔ 완료된 단계·항목</h4>
       ${completedHTML}
@@ -652,6 +673,7 @@
     L.push(`${i.customer || '-'} / ${i.site || '-'} / ${i.model} / S/N ${i.sn || '-'}`);
     L.push(`인계: ${i.owner || '-'} → 인수: ${i.nextOwner || '-'} / 교대 시작 ${fmtTime(i.shiftStart)}`);
     L.push(`전체 진행률 ${s.p.pct}% (${s.p.done}/${s.p.total}), 조건부 완료 ${s.p.cond}, 보류 ${s.p.hold}, 기준 이탈 ${s.p.out}, 열린 이슈 ${s.openIssues.length}`);
+    if (s.others.length) L.push(`※ 다른 모델 기록 보관 중 (이 요약에는 미포함): ${s.others.map(o => `${modelLabel(o.model)} ${o.n}건`).join(', ')}`);
     L.push('', '■ 완료');
     if (s.completed.length) s.completed.forEach(x => L.push(`- ${x.st.name} > ${x.it.name}${x.r.status === 'na' ? ' (해당 없음)' : ''}${x.valTxt}`)); else L.push('- 없음');
     L.push('', '■ 조건부 완료 (진행률 제외)');
@@ -714,8 +736,20 @@
 
   document.querySelectorAll('[data-info]').forEach(el => {
     const h = () => {
-      const c = cur(); c.info[el.dataset.info] = el.value; save(); renderInfoLine();
-      if (el.dataset.info === 'model') renderStages();
+      const c = cur();
+      if (el.dataset.info === 'model') {
+        const prev = c.info.model, next = el.value;
+        if (prev === next) return;
+        const n = countRecords(c, prev);
+        if (n && !confirm(`현재 모델(${prev})에 기록이 ${n}건 있어요.\n\n모델을 바꾸면 ${next} 체크리스트로 바뀌어요. ${prev} 기록은 지워지지 않고 따로 보관되며, 다시 ${prev}(으)로 바꾸면 돌아와요.\n\n바꿀까요?`)) {
+          el.value = prev; return;
+        }
+        c.info.model = next; save(); renderInfoLine(); renderStages();
+        const m = countRecords(c, next);
+        toast(m ? `${next}에 남겨 둔 기록 ${m}건을 불러왔어요` : `${next} 빈 체크리스트로 시작해요`);
+        return;
+      }
+      c.info[el.dataset.info] = el.value; save(); renderInfoLine();
       if (['customer', 'site', 'sn'].includes(el.dataset.info)) renderCaseSelect();
     };
     el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', h);
