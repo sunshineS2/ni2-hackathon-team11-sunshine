@@ -27,6 +27,17 @@
   nav.tabs button { flex: 1; padding: 12px 8px; border: 1px solid var(--line); background: var(--card); border-radius: 10px; font-size: 15px; font-weight: 600; color: var(--muted); cursor: pointer; }
   nav.tabs button[aria-selected="true"] { background: var(--primary); color: #fff; border-color: var(--primary); }
   section.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-bottom: 14px; }
+  details.info-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 14px; }
+  details.info-card > summary { list-style: none; cursor: pointer; padding: 14px 16px; display: flex; align-items: center; gap: 10px; }
+  details.info-card > summary::-webkit-details-marker { display: none; }
+  details.info-card .info-title { font-size: 16px; font-weight: 700; }
+  details.info-card .info-title { white-space: nowrap; }
+  details.info-card .info-line { flex: 1 1 0; min-width: 0; font-size: 14px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  details.info-card .info-toggle { margin-left: auto; }
+  details.info-card .info-toggle::after { content: "펼치기 ▾"; font-size: 13px; font-weight: 600; color: var(--primary); white-space: nowrap; }
+  details.info-card[open] .info-toggle::after { content: "접기 ▴"; }
+  details.info-card[open] .info-line { display: none; }
+  details.info-card .info-body { padding: 0 16px 16px; }
   section.card > h2 { font-size: 16px; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 12px; }
   label.f { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
@@ -152,8 +163,13 @@
 
   <!-- ===== 기능 1: 단계별 셋업 체크리스트 ===== -->
   <div id="view-check">
-    <section class="card">
-      <h2>셋업 건 정보</h2>
+    <details class="card info-card" id="infoCard">
+      <summary>
+        <span class="info-title">셋업 건 정보</span>
+        <span class="info-line" id="infoLine"></span>
+        <span class="info-toggle" aria-hidden="true"></span>
+      </summary>
+      <div class="info-body">
       <div class="case-bar">
         <label class="f">셋업 건 선택
           <select id="caseSelect"></select>
@@ -172,7 +188,8 @@
         <label class="f">다음 담당자<input data-info="nextOwner" placeholder="예: FSE-2"></label>
         <label class="f">교대 시작 시각<input type="datetime-local" data-info="shiftStart"></label>
       </div>
-    </section>
+      </div>
+    </details>
 
     <section class="card">
       <h2>진행 현황</h2>
@@ -317,9 +334,17 @@
     $('#modelSelect').innerHTML = Object.entries(TEMPLATES).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join('');
   }
 
+  function renderInfoLine() {
+    const i = cur().info;
+    const parts = [i.customer, i.sn, (i.owner || i.nextOwner) ? `${i.owner || '?'} → ${i.nextOwner || '?'}` : ''].filter(Boolean);
+    $('#infoLine').textContent = parts.length ? parts.join(' · ') : '입력된 정보 없음 (눌러서 입력)';
+  }
   function renderInfo() {
     const c = cur();
     document.querySelectorAll('[data-info]').forEach(el => { el.value = c.info[el.dataset.info] ?? ''; });
+    // 고객사가 입력된 셋업 건은 접어서 한 줄 요약만, 빈 셋업 건은 펼쳐서 바로 입력
+    $('#infoCard').open = !c.info.customer;
+    renderInfoLine();
   }
 
   function renderProgress() {
@@ -531,7 +556,7 @@
 
   document.querySelectorAll('[data-info]').forEach(el => {
     const h = () => {
-      const c = cur(); c.info[el.dataset.info] = el.value; save();
+      const c = cur(); c.info[el.dataset.info] = el.value; save(); renderInfoLine();
       if (el.dataset.info === 'model') renderStages();
       if (['customer', 'site', 'sn'].includes(el.dataset.info)) renderCaseSelect();
     };
