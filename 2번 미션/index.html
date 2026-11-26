@@ -6,9 +6,10 @@
 <title>핸드오버 체크 | 장비 셋업 체크리스트·인수인계</title>
 <style>
   :root {
-    --bg: #f4f6f9; --card: #fff; --line: #dde2ea; --text: #1d2433; --muted: #5d6779;
-    --primary: #2457c5; --primary-weak: #e8effd; --ok: #1f8a4c; --ok-weak: #e6f5ec;
-    --warn: #b7791f; --warn-weak: #fdf3e1; --bad: #d12c2c; --bad-weak: #fdeaea; --na: #7a8496;
+    /* B. 라이트 고대비 테마 (옐로우룸 대응: 파랑·노랑·호박색 없음, 색 대신 밝기 차이·테두리·글자로 구분) */
+    --bg: #ffffff; --card: #fff; --line: #777; --text: #111; --muted: #3d3d3d;
+    --primary: #111; --primary-weak: #eee; --ok: #0b6b2e; --ok-weak: #fff;
+    --warn: #111; --warn-weak: #fff; --bad: #b00000; --bad-weak: #fff; --na: #555;
     --radius: 12px;
   }
   * { box-sizing: border-box; }
@@ -114,6 +115,36 @@
   .toast.show { opacity: 1; }
   footer { text-align: center; font-size: 12px; color: var(--muted); padding: 10px 16px 30px; }
   .hidden { display: none !important; }
+
+  /* ---- B. 라이트 고대비: 색·테두리만 덮어쓰기 (기능 변경 없음) ---- */
+  .notice { background: #fff; border: 2px solid #111; color: #111; }
+  input, select, textarea { border-color: #777; }
+  input:focus, select:focus, textarea:focus { outline: 3px solid #111; }
+  .btn { border-color: #777; }
+  .btn.danger { border-color: var(--bad); }
+  .pill { background: #fff; color: #111; border: 1px solid #555; }
+  .pill.ok { background: var(--ok); color: #fff; border-color: var(--ok); }
+  .pill.bad { background: var(--bad); color: #fff; border-color: var(--bad); }
+  .pill.warn { background: #fff; color: #111; border: 1px dashed #111; }
+  .pill.sev-high { background: var(--bad); color: #fff; border-color: var(--bad); }
+  .pill.sev-mid { background: #111; color: #fff; border-color: #111; }
+  .pill.sev-low { background: #fff; color: #111; border-color: #555; }
+  .stat { background: #fff; border: 1px solid #777; }
+  .stat.bad { border: 2px solid var(--bad); }
+  .stage-prog div { border-color: #777; }
+  .stage-prog div.done { background: #fff; border: 2px solid var(--ok); color: var(--ok); font-weight: 700; }
+  .stage-prog div.has-bad { border: 3px solid var(--bad); }
+  details.stage, details.info-card, section.card { border-color: #777; }
+  .item.out { background: #fff; box-shadow: inset 0 0 0 3px var(--bad); }
+  .item.out .meas input { border-width: 3px; }
+  .verdict.bad::before { content: "▲ "; }
+  .seg { border-color: #777; }
+  .seg button { color: #444; border-right-color: #777; }
+  .seg button[aria-pressed="true"][data-v="done"] { background: var(--ok); color: #fff; font-weight: 700; }
+  .seg button[aria-pressed="true"][data-v="hold"] { background: #fff; color: #111; font-weight: 700; outline: 2px dashed #111; outline-offset: -4px; }
+  .seg button[aria-pressed="true"][data-v="na"] { background: #555; color: #fff; font-weight: 700; }
+  .issue { background: #fff; border-color: #777; }
+  .toast { background: #111; }
 
   @media (max-width: 700px) {
     body { font-size: 15px; }
