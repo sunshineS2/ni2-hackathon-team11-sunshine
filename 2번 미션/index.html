@@ -422,14 +422,21 @@
   const rec = (c, itemId) => (c.records[itemId] ||= { status: '', value: '', memo: '', issues: [] });
 
   // ---------- 판정 ----------
+  // 측정값 허용 형식: 부호(-)와 소수점만 (예: 0.55, -80, .3). 지수(1e1), +, 쉼표 등은 형식 오류
+  const NUM_RE = /^-?(\d+(\.\d*)?|\.\d+)$/;
   function judge(item, value) {
-    if (item.type !== 'measure' || value === '' || value == null) return null;
-    const v = Number(value);
+    if (item.type !== 'measure' || value == null || String(value).trim() === '') return null;
+    const t = String(value).trim();
+    if (!NUM_RE.test(t)) return 'invalid';
+    const v = Number(t);
     if (!isFinite(v)) return 'invalid';
     if (item.min != null && v < item.min) return 'out';
     if (item.max != null && v > item.max) return 'out';
     return 'ok';
   }
+  const verdictText = j => j === 'out' ? '기준 이탈' : j === 'ok' ? '기준 이내' : j === 'invalid' ? '숫자 형식이 아니에요 (예: 0.55, -80)' : '';
+  const verdictClass = j => (j === 'out' || j === 'invalid') ? 'bad' : j === 'ok' ? 'ok' : '';
+  const itemDef = (c, itemId) => tpl(c).stages.flatMap(s => s.items).find(i => i.id === itemId);
 
   function compute(c) {
     const t = tpl(c);
@@ -502,10 +509,10 @@
       `<button type="button" data-act="status" data-v="${v}" aria-pressed="${r.status === v}">${STATUS_LABEL[v]}</button>`).join('');
     const meas = it.type === 'measure' ? `
       <div class="meas">
-        <input type="number" step="any" inputmode="decimal" data-act="value" value="${esc(r.value)}" placeholder="측정값" aria-label="${esc(it.name)} 측정값">
+        <input type="text" inputmode="${(it.min < 0 || it.max < 0) ? 'text' : 'decimal'}" autocomplete="off" spellcheck="false" data-act="value" value="${esc(r.value)}" placeholder="측정값" aria-label="${esc(it.name)} 측정값">
         <span class="unit">${esc(it.unit)}</span>
         <span class="spec">기준: ${esc(it.specText)} ${esc(it.unit)} <span class="pill warn">샘플</span></span>
-        <span class="verdict ${j === 'out' ? 'bad' : j === 'ok' ? 'ok' : ''}" data-verdict>${j === 'out' ? '기준 이탈' : j === 'ok' ? '기준 이내' : j === 'invalid' ? '숫자를 입력하세요' : ''}</span>
+        <span class="verdict ${verdictClass(j)}" data-verdict>${verdictText(j)}</span>
       </div>` : '';
     const issues = r.issues.map(is => `
       <div class="issue ${is.closed ? 'closed' : ''}" data-issue="${is.id}">
@@ -515,7 +522,7 @@
         <button class="btn sm danger" data-act="delIssue" aria-label="이슈 삭제">삭제</button>
       </div>`).join('');
     return `
-      <div class="item ${j === 'out' ? 'out' : ''}" data-item="${it.id}">
+      <div class="item ${j === 'out' || j === 'invalid' ? 'out' : ''}" data-item="${it.id}">
         <div class="item-head">
           <span class="item-title">${esc(it.name)}</span>
           <span class="pill">${it.type === 'measure' ? '측정값' : '체크'}</span>
@@ -558,13 +565,15 @@
   // ---------- 기능 2: 인수인계 요약 생성 ----------
   function buildSummary(c) {
     const t = tpl(c); const p = compute(c);
-    const completed = [], pending = [], openIssues = [], outs = [];
+    const completed = [], pending = [], openIssues = [], outs = [], invalids = [];
     t.stages.forEach(st => st.items.forEach(it => {
       const r = rec(c, it.id); const j = judge(it, r.value);
-      const valTxt = it.type === 'measure' && r.value !== '' ? ` (측정 ${r.value} ${it.unit}, 기준 ${it.specText}${j === 'out' ? ', 기준 이탈' : ''})` : '';
+      const valTxt = j === 'invalid' ? ` (측정값 형식 오류: "${String(r.value).trim()}" → 숫자로 다시 입력 필요)`
+        : it.type === 'measure' && j ? ` (측정 ${String(r.value).trim()} ${it.unit}, 기준 ${it.specText}${j === 'out' ? ', 기준 이탈' : ''})` : '';
       if (r.status === 'done' || r.status === 'na') completed.push({ st, it, r, valTxt, j });
       else pending.push({ st, it, r, valTxt, j });
       if (j === 'out') outs.push({ st, it, r });
+      if (j === 'invalid') invalids.push({ st, it, r });
       r.issues.filter(is => !is.closed).forEach(is => openIssues.push({ st, it, is }));
     }));
     openIssues.sort((a, b) => SEV_ORDER[a.is.sev] - SEV_ORDER[b.is.sev] || a.is.at - b.is.at);
@@ -576,6 +585,7 @@
       const r = rec(c, o.it.id); const out = judge(o.it, r.value) === 'out';
       push(o.it.id, `[이슈·높음] ${o.st.name} › ${o.it.name}: ${o.is.text}${out ? ` (측정 ${r.value} ${o.it.unit}, 기준 ${o.it.specText} 이탈 → 조치 후 재측정)` : ''}`);
     });
+    invalids.forEach(o => push(o.it.id, `[측정값 확인] ${o.st.name} › ${o.it.name}: "${String(o.r.value).trim()}"은 숫자 형식이 아님 → 다시 측정·입력`));
     outs.forEach(o => push(o.it.id, `[기준 이탈] ${o.st.name} › ${o.it.name}: ${o.r.value} ${o.it.unit} → 원인 확인 후 재측정 (기준 ${o.it.specText})`));
     pending.filter(x => x.r.status === 'hold').forEach(x => push(x.it.id, `[보류 해소] ${x.st.name} › ${x.it.name}${x.r.memo ? ` (사유: ${x.r.memo})` : ''}`));
     openIssues.filter(o => o.is.sev === 'mid').forEach(o => push(o.it.id, `[이슈·중간] ${o.st.name} › ${o.it.name}: ${o.is.text}`));
@@ -592,7 +602,7 @@
     s.completed.forEach(x => (byStage[x.st.name] ||= []).push(x));
     const completedHTML = Object.keys(byStage).length
       ? `<ul>${Object.entries(byStage).map(([name, xs]) => `<li><b>${esc(name)}</b>: ${xs.map(x =>
-          `${esc(x.it.name)}${x.r.status === 'na' ? ' (해당 없음)' : ''}<span class="${x.j === 'out' ? 'redtxt' : ''}">${esc(x.valTxt)}</span>`).join(', ')}</li>`).join('')}</ul>`
+          `${esc(x.it.name)}${x.r.status === 'na' ? ' (해당 없음)' : ''}<span class="${x.j === 'out' || x.j === 'invalid' ? 'redtxt' : ''}">${esc(x.valTxt)}</span>`).join(', ')}</li>`).join('')}</ul>`
       : `<p class="empty">없음</p>`;
     return `
       <h3>장비 셋업 인수인계 요약</h3>
@@ -604,7 +614,7 @@
       ${completedHTML}
 
       <h4>□ 미완료·보류 항목과 그 이유</h4>
-      ${li(s.pending.map(x => `<li><span class="pill ${x.r.status === 'hold' ? 'warn' : ''}">${STATUS_LABEL[x.r.status]}</span> ${esc(x.st.name)} › ${esc(x.it.name)}<span class="${x.j === 'out' ? 'redtxt' : ''}">${esc(x.valTxt)}</span>${x.r.memo ? ` - 사유: ${esc(x.r.memo)}` : x.r.status === 'hold' ? ' - 사유: <span class="redtxt">미기재</span>' : ''}</li>`))}
+      ${li(s.pending.map(x => `<li><span class="pill ${x.r.status === 'hold' ? 'warn' : ''}">${STATUS_LABEL[x.r.status]}</span> ${esc(x.st.name)} › ${esc(x.it.name)}<span class="${x.j === 'out' || x.j === 'invalid' ? 'redtxt' : ''}">${esc(x.valTxt)}</span>${x.r.memo ? ` - 사유: ${esc(x.r.memo)}` : x.r.status === 'hold' ? ' - 사유: <span class="redtxt">미기재</span>' : ''}</li>`))}
 
       <h4>⚠ 열린 이슈 (심각도순)</h4>
       ${li(s.openIssues.map(o => `<li><span class="pill sev-${o.is.sev}">${SEV_LABEL[o.is.sev]}</span> ${esc(o.st.name)} › ${esc(o.it.name)}: ${esc(o.is.text)}</li>`))}
@@ -695,7 +705,14 @@
     const btn = e.target.closest('[data-act]'); if (!btn) return;
     const itemEl = btn.closest('[data-item]'); if (!itemEl) return;
     const c = cur(); const r = rec(c, itemEl.dataset.item); const act = btn.dataset.act;
-    if (act === 'status') { r.status = r.status === btn.dataset.v ? '' : btn.dataset.v; }
+    if (act === 'status') {
+      if (btn.dataset.v === 'done' && r.status !== 'done' && judge(itemDef(c, itemEl.dataset.item), r.value) === 'invalid') {
+        toast('측정값을 숫자로 고친 뒤 완료할 수 있어요');
+        itemEl.querySelector('[data-act="value"]')?.focus();
+        return;
+      }
+      r.status = r.status === btn.dataset.v ? '' : btn.dataset.v;
+    }
     else if (act === 'addIssue') {
       const txt = itemEl.querySelector('[data-issue-text]').value.trim();
       if (!txt) { toast('이슈 내용을 입력하세요'); return; }
@@ -716,13 +733,22 @@
     if (el.dataset.act === 'memo') { r.memo = el.value; save(); }
     else if (el.dataset.act === 'value') {
       r.value = el.value; save();
-      const it = tpl(c).stages.flatMap(s => s.items).find(i => i.id === itemEl.dataset.item);
-      const j = judge(it, r.value);
-      itemEl.classList.toggle('out', j === 'out');
+      const j = judge(itemDef(c, itemEl.dataset.item), r.value);
+      itemEl.classList.toggle('out', j === 'out' || j === 'invalid');
       const v = itemEl.querySelector('[data-verdict]');
-      v.className = 'verdict ' + (j === 'out' ? 'bad' : j === 'ok' ? 'ok' : '');
-      v.textContent = j === 'out' ? '기준 이탈' : j === 'ok' ? '기준 이내' : j === 'invalid' ? '숫자를 입력하세요' : '';
+      v.className = 'verdict ' + verdictClass(j);
+      v.textContent = verdictText(j);
       renderProgress();
+    }
+  });
+  // 입력을 마친 뒤(칸을 벗어날 때) 형식 오류 값이면 완료를 해제해 진행률과 판정을 맞춤
+  stagesEl.addEventListener('change', e => {
+    const el = e.target; if (el.dataset.act !== 'value') return;
+    const itemEl = el.closest('[data-item]'); if (!itemEl) return;
+    const c = cur(); const r = rec(c, itemEl.dataset.item);
+    if (r.status === 'done' && judge(itemDef(c, itemEl.dataset.item), r.value) === 'invalid') {
+      r.status = ''; save(); renderItem(itemEl.dataset.item); renderProgress();
+      toast('측정값이 숫자 형식이 아니라 완료를 해제했어요');
     }
   });
 
