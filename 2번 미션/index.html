@@ -145,6 +145,7 @@
   .seg button[aria-pressed="true"][data-v="na"] { background: #555; color: var(--card); font-weight: 700; }
   .issue { background: var(--card); border-color: #777; }
   .toast { background: var(--primary); }
+  .notice.storage-alert { border: 3px solid var(--bad); }
 
   @media (max-width: 700px) {
     body { font-size: 15px; }
@@ -182,6 +183,10 @@
 </header>
 
 <main>
+  <div class="notice storage-alert hidden" id="storageAlert" role="alert">
+    <b>저장 알림</b> · <span data-msg></span>
+    <button class="btn sm" type="button" id="closeStorageAlert" style="margin-left:6px">확인</button>
+  </div>
   <div class="notice">
     <b>시제품 안내</b> · 체크리스트 단계·항목·기준값은 실습용 <b>샘플 데이터</b>이며 ㈜오로스테크놀로지의 실제 셋업 절차·사양이 아닙니다.
     입력 내용은 이 기기의 브라우저(localStorage)에만 저장되고 서버로 전송되지 않습니다.
@@ -312,15 +317,106 @@
 
   // ---------- 저장/불러오기 ----------
   let state;
-  function load() {
-    try { state = JSON.parse(localStorage.getItem(STORE_KEY)); } catch (e) { state = null; }
-    if (!state || !Array.isArray(state.cases) || !state.cases.length) {
-      const c = sampleCase();
-      state = { cases: [c], currentId: c.id };
-    }
-    if (!state.cases.find(c => c.id === state.currentId)) state.currentId = state.cases[0].id;
+  const BACKUP_KEY = STORE_KEY + '-backup';
+  const INFO_KEYS = ['customer', 'site', 'model', 'sn', 'owner', 'nextOwner', 'shiftStart'];
+  const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
+  const str = v => (typeof v === 'string' ? v : (typeof v === 'number' && isFinite(v)) ? String(v) : '');
+
+  // 저장 데이터를 앱이 쓸 수 있는 모양으로 고치고, 고친 곳이 있었는지 알려줌
+  function normalizeState(raw) {
+    let fixed = false;
+    const cases = [];
+    const seen = new Set();
+    (Array.isArray(raw?.cases) ? raw.cases : []).forEach(rc => {
+      if (!isObj(rc)) { fixed = true; return; }
+      let id = str(rc.id);
+      if (!id || seen.has(id)) { id = uid(); fixed = true; }
+      seen.add(id);
+      const ri = isObj(rc.info) ? rc.info : (fixed = true, {});
+      const info = {};
+      INFO_KEYS.forEach(k => { info[k] = str(ri[k]); if (ri[k] != null && typeof ri[k] !== 'string') fixed = true; });
+      if (!TEMPLATES[info.model]) { if (info.model) fixed = true; info.model = 'OL-SAMPLE'; }
+      const records = {};
+      if (!isObj(rc.records)) { if (rc.records != null || !('records' in rc)) fixed = true; }
+      else Object.entries(rc.records).forEach(([itemId, rr]) => {
+        if (!isObj(rr)) { fixed = true; return; }
+        const status = ['done', 'hold', 'na', ''].includes(rr.status) ? rr.status : (fixed = true, '');
+        const issues = (Array.isArray(rr.issues) ? rr.issues : (fixed = true, [])).filter(is => {
+          const ok = isObj(is) && str(is.text).trim();
+          if (!ok) fixed = true;
+          return ok;
+        }).map(is => ({
+          id: str(is.id) || uid(),
+          text: str(is.text),
+          sev: SEV_ORDER[is.sev] != null ? is.sev : 'mid',
+          closed: is.closed === true,
+          at: typeof is.at === 'number' ? is.at : Date.now()
+        }));
+        if (typeof rr.value !== 'string' || typeof rr.memo !== 'string') fixed = fixed || rr.value != null || rr.memo != null;
+        records[itemId] = { status, value: str(rr.value), memo: str(rr.memo), issues };
+      });
+      cases.push({ id, info, records });
+    });
+    if (!cases.length) return { state: null, fixed: true };
+    const currentId = cases.some(c => c.id === raw.currentId) ? raw.currentId : cases[0].id;
+    return { state: { cases, currentId }, fixed };
   }
-  function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {} }
+
+  function backupRaw(raw) {
+    try { localStorage.setItem(BACKUP_KEY, JSON.stringify({ savedAt: new Date().toISOString(), data: raw })); return true; } catch (e) { return false; }
+  }
+
+  // 저장 관련 안내 (손상 복구, 저장 실패)
+  let storageMsg = '';
+  function showStorageAlert(msg) {
+    storageMsg = msg;
+    const el = document.getElementById('storageAlert');
+    if (!el) return;
+    el.querySelector('[data-msg]').textContent = msg;
+    el.classList.toggle('hidden', !msg);
+  }
+
+  function load() {
+    let raw = null, text = null;
+    showStorageAlert('');
+    try { text = localStorage.getItem(STORE_KEY); } catch (e) { text = null; }
+    if (text != null) {
+      try { raw = JSON.parse(text); }
+      catch (e) {
+        const b = backupRaw(text);
+        showStorageAlert(`저장된 기록이 손상되어 읽을 수 없어요. 샘플 데이터로 새로 시작했어요.${b ? ' 원본은 브라우저에 따로 백업해 두었어요.' : ''}`);
+      }
+    }
+    if (raw != null) {
+      const n = normalizeState(raw);
+      if (n.state) {
+        state = n.state;
+        if (n.fixed) {
+          const b = backupRaw(raw);
+          showStorageAlert(`저장된 기록 일부가 손상되어 읽을 수 있는 부분만 불러왔어요. 빠진 항목이 없는지 확인해 주세요.${b ? ' 원본은 따로 백업해 두었어요.' : ''}`);
+          save();
+        }
+        return;
+      }
+      const b = backupRaw(raw);
+      showStorageAlert(`저장된 기록에서 쓸 수 있는 셋업 건을 찾지 못해 샘플 데이터로 새로 시작했어요.${b ? ' 원본은 따로 백업해 두었어요.' : ''}`);
+    }
+    const c = sampleCase();
+    state = { cases: [c], currentId: c.id };
+  }
+
+  let saveFailed = false;
+  function save() {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(state));
+      if (saveFailed) { saveFailed = false; showStorageAlert(''); toast('저장이 다시 되고 있어요'); }
+    } catch (e) {
+      if (!saveFailed) {
+        saveFailed = true;
+        showStorageAlert('브라우저에 저장하지 못했어요 (저장 공간 부족 또는 저장 차단). 지금 입력한 내용은 이 창을 닫으면 사라져요. 인수인계 요약의 "요약 복사"로 내용을 따로 보관해 주세요.');
+      }
+    }
+  }
   const cur = () => state.cases.find(c => c.id === state.currentId);
   const tpl = c => TEMPLATES[c.info.model] || TEMPLATES['OL-SAMPLE'];
   const rec = (c, itemId) => (c.records[itemId] ||= { status: '', value: '', memo: '', issues: [] });
@@ -630,6 +726,7 @@
     }
   });
 
+  $('#closeStorageAlert').addEventListener('click', () => { if (!saveFailed) showStorageAlert(''); else toast('저장 문제가 해결되면 안내가 사라져요'); });
   load(); renderAll();
 })();
 </script>
