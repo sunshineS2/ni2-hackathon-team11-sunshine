@@ -5,16 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>핸드오버 체크 | 장비 셋업 체크리스트·인수인계</title>
 <style>
+  /* B. 라이트 고대비 테마 (옐로우룸 대응: 파랑·노랑·호박색 없음, 색 대신 밝기 차이·테두리·글자로 구분)
+     배경은 미색, 검정은 차콜로 낮춤. 규칙마다 한 곳에서만 정의 (중복 정리) */
   :root {
-    /* B. 라이트 고대비 테마 (옐로우룸 대응: 파랑·노랑·호박색 없음, 색 대신 밝기 차이·테두리·글자로 구분) */
-    --bg: #f4f1e8; --card: #fbf9f2; /* 미색: 눈부심 줄이기 */ --line: #777; --text: #2a2723; --muted: #3d3d3d;
-    --primary: #3a3631; /* 차콜: 검정 쨍함 줄이기 */ --primary-weak: #eee; --ok: #0b6b2e; --ok-weak: #fff;
-    --warn: #2a2723; --warn-weak: #fff; --bad: #b00000; --bad-weak: #fff; --na: #555;
+    --bg: #f4f1e8; --card: #fbf9f2; --line: #777; --text: #2a2723; --muted: #3d3d3d;
+    --primary: #3a3631; --ok: #0b6b2e; --warn: #2a2723; --bad: #b00000; --na: #555; --pill-line: #555;
     --radius: 12px;
   }
   * { box-sizing: border-box; }
   body { margin: 0; font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
     background: var(--bg); color: var(--text); line-height: 1.5; font-size: 15px; word-break: keep-all; }
+
+  /* 머리글 */
   header.top { background: var(--primary); color: var(--card); padding: 14px 16px; position: sticky; top: 0; z-index: 10; }
   header.top .row { max-width: 960px; margin: 0 auto; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   header.top h1 { font-size: 18px; margin: 0; flex: 1 1 auto; }
@@ -23,54 +25,69 @@
   .bar { height: 8px; background: rgba(255,255,255,.3); border-radius: 99px; overflow: hidden; margin-top: 4px; }
   .bar > i { display: block; height: 100%; background: var(--card); width: 0; transition: width .3s; }
   main { max-width: 960px; margin: 0 auto; padding: 16px; }
-  .notice { background: var(--warn-weak); border: 1px solid #f0d9a8; color: #6b4a10; border-radius: var(--radius); padding: 10px 12px; font-size: 13px; margin-bottom: 14px; }
+
+  /* 안내문 */
+  .notice { background: var(--card); border: 2px solid var(--text); color: var(--text); border-radius: var(--radius); padding: 10px 12px; font-size: 13px; margin-bottom: 14px; }
+  .notice.storage-alert { border: 3px solid var(--bad); }
+
+  /* 탭 */
   nav.tabs { display: flex; gap: 6px; margin-bottom: 14px; }
   nav.tabs button { flex: 1; padding: 12px 8px; border: 1px solid var(--line); background: var(--card); border-radius: 10px; font-size: 15px; font-weight: 600; color: var(--muted); cursor: pointer; }
   nav.tabs button[aria-selected="true"] { background: var(--primary); color: var(--card); border-color: var(--primary); }
+
+  /* 카드 */
   section.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-bottom: 14px; }
+  section.card > h2 { font-size: 16px; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   details.info-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 14px; }
   details.info-card > summary { list-style: none; cursor: pointer; padding: 14px 16px; display: flex; align-items: center; gap: 10px; }
   details.info-card > summary::-webkit-details-marker { display: none; }
-  details.info-card .info-title { font-size: 16px; font-weight: 700; }
-  details.info-card .info-title { white-space: nowrap; }
+  details.info-card .info-title { font-size: 16px; font-weight: 700; white-space: nowrap; }
   details.info-card .info-line { flex: 1 1 0; min-width: 0; font-size: 14px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   details.info-card .info-toggle { margin-left: auto; }
   details.info-card .info-toggle::after { content: "펼치기 ▾"; font-size: 13px; font-weight: 600; color: var(--primary); white-space: nowrap; }
   details.info-card[open] .info-toggle::after { content: "접기 ▴"; }
   details.info-card[open] .info-line { display: none; }
   details.info-card .info-body { padding: 0 16px 16px; }
-  section.card > h2 { font-size: 16px; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+  /* 입력·버튼 */
   .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 12px; }
   label.f { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
   input, select, textarea { font: inherit; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; background: var(--card); width: 100%; }
-  input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); outline-offset: 0; border-color: var(--primary); }
+  input:focus, select:focus, textarea:focus { outline: 3px solid var(--text); outline-offset: 0; border-color: var(--primary); }
   textarea { resize: vertical; min-height: 40px; }
   .btn { font: inherit; font-weight: 600; border: 1px solid var(--line); background: var(--card); color: var(--text); padding: 9px 14px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
   .btn.primary { background: var(--primary); color: var(--card); border-color: var(--primary); }
-  .btn.danger { color: var(--bad); border-color: #f1c2c2; }
+  .btn.danger { color: var(--bad); border-color: var(--bad); }
   .btn.sm { padding: 5px 10px; font-size: 13px; }
   .btn.big { width: 100%; padding: 14px; font-size: 16px; }
   .row-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .case-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 12px; }
   .case-bar label.f { flex: 1 1 220px; }
-  .pill { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 99px; background: #eef1f5; color: var(--muted); font-weight: 600; }
-  .pill.ok { background: var(--ok-weak); color: var(--ok); }
-  .pill.bad { background: var(--bad-weak); color: var(--bad); }
-  .pill.warn { background: var(--warn-weak); color: var(--warn); }
-  .pill.sev-high { background: var(--bad); color: var(--card); }
-  .pill.sev-mid { background: var(--warn); color: var(--card); }
-  .pill.sev-low { background: #8a94a6; color: var(--card); }
-  /* progress */
+
+  /* 배지 */
+  .pill { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 99px; background: var(--card); color: var(--text); font-weight: 600; border: 1px solid var(--pill-line); }
+  .pill.ok { background: var(--ok); color: var(--card); border-color: var(--ok); }
+  .pill.bad { background: var(--bad); color: var(--card); border-color: var(--bad); }
+  .pill.warn { background: var(--card); color: var(--text); border: 1px dashed var(--text); }
+  .pill.cond { background: var(--card); color: var(--ok); border: 1px solid var(--ok); }
+  .pill.sev-high { background: var(--bad); color: var(--card); border-color: var(--bad); }
+  .pill.sev-mid { background: var(--primary); color: var(--card); border-color: var(--primary); }
+  .pill.sev-low { background: var(--card); color: var(--text); border-color: var(--pill-line); }
+
+  /* 진행 현황 */
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px; }
   .stat { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px; text-align: center; }
   .stat b { display: block; font-size: 22px; }
   .stat span { font-size: 12px; color: var(--muted); }
-  .stat.bad b { color: var(--bad); }
+  /* 기준 이탈 카드: 이탈이 1건 이상일 때만 빨간 테두리·숫자 */
+  .stat.bad.alert { border: 2px solid var(--bad); }
+  .stat.bad.alert b { color: var(--bad); }
   .stage-prog { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .stage-prog div { font-size: 13px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; display: flex; justify-content: space-between; gap: 6px; }
-  .stage-prog div.done { background: var(--ok-weak); border-color: #b9e2c8; }
-  .stage-prog div.has-bad { border-color: var(--bad); }
-  /* stages */
+  .stage-prog div.done { background: var(--card); border: 2px solid var(--ok); color: var(--ok); font-weight: 700; }
+  .stage-prog div.has-bad { border: 3px solid var(--bad); }
+
+  /* 단계·항목 */
   details.stage { border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); margin-bottom: 10px; overflow: hidden; }
   details.stage > summary { list-style: none; cursor: pointer; padding: 14px 16px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
   details.stage > summary::-webkit-details-marker { display: none; }
@@ -78,22 +95,26 @@
   details.stage[open] > summary::before { transform: rotate(90deg); }
   details.stage > summary .sp { flex: 1; }
   .item { border-top: 1px solid var(--line); padding: 14px 16px; }
-  .item.out { background: var(--bad-weak); }
+  .item.out { background: var(--card); box-shadow: inset 0 0 0 3px var(--bad); }
   .item-head { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; flex-wrap: wrap; }
   .item-title { font-weight: 600; }
+  .cond-note { margin-top: 6px; font-size: 13px; color: var(--ok); font-weight: 600; }
   .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin-top: 8px; }
-  .seg button { font: inherit; font-size: 14px; border: 0; background: var(--card); padding: 8px 12px; cursor: pointer; color: var(--muted); border-right: 1px solid var(--line); }
+  .seg button { font: inherit; font-size: 14px; border: 0; background: var(--card); padding: 8px 12px; cursor: pointer; color: #444; border-right: 1px solid var(--line); }
   .seg button:last-child { border-right: 0; }
-  .seg button[aria-pressed="true"][data-v="done"] { background: var(--ok); color: var(--card); }
-  .seg button[aria-pressed="true"][data-v="hold"] { background: var(--warn); color: var(--card); }
-  .seg button[aria-pressed="true"][data-v="na"] { background: var(--na); color: var(--card); }
+  .seg button[aria-pressed="true"][data-v="done"] { background: var(--ok); color: var(--card); font-weight: 700; }
+  .seg button[aria-pressed="true"][data-v="done"].cond { background: var(--card); color: var(--ok); outline: 2px solid var(--ok); outline-offset: -4px; }
+  .seg button[aria-pressed="true"][data-v="hold"] { background: var(--card); color: var(--text); font-weight: 700; outline: 2px dashed var(--text); outline-offset: -4px; }
+  .seg button[aria-pressed="true"][data-v="na"] { background: var(--na); color: var(--card); font-weight: 700; }
   .meas { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
   .meas input { width: 140px; }
   .meas .unit { font-weight: 600; }
   .meas .spec { font-size: 13px; color: var(--muted); }
   .meas .verdict { font-size: 13px; font-weight: 700; }
-  .item.out .meas input { border-color: var(--bad); color: var(--bad); font-weight: 700; }
-  .verdict.bad { color: var(--bad); } .verdict.ok { color: var(--ok); }
+  .item.out .meas input { border: 3px solid var(--bad); color: var(--bad); font-weight: 700; }
+  .verdict.bad { color: var(--bad); }
+  .verdict.bad::before { content: "▲ "; }
+  .verdict.ok { color: var(--ok); }
   .item textarea { margin-top: 10px; }
   .issues { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
   .issue { display: flex; gap: 8px; align-items: center; font-size: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; flex-wrap: wrap; }
@@ -102,7 +123,8 @@
   .issue-form { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
   .issue-form input { flex: 1 1 180px; }
   .issue-form select { width: auto; }
-  /* summary */
+
+  /* 인수인계 요약 */
   .summary-sheet { background: var(--card); border: 2px solid var(--text); border-radius: 10px; padding: 18px; }
   .summary-sheet h3 { margin: 0 0 4px; font-size: 18px; }
   .summary-sheet h4 { margin: 16px 0 6px; font-size: 15px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
@@ -111,45 +133,12 @@
   .summary-sheet .meta { font-size: 13px; color: var(--muted); }
   .summary-sheet .redtxt { color: var(--bad); font-weight: 700; }
   .empty { color: var(--muted); font-size: 14px; }
+
+  /* 기타 */
   .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--primary); color: var(--card); padding: 10px 16px; border-radius: 99px; font-size: 14px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 50; }
   .toast.show { opacity: 1; }
   footer { text-align: center; font-size: 12px; color: var(--muted); padding: 10px 16px 30px; }
   .hidden { display: none !important; }
-
-  /* ---- B. 라이트 고대비: 색·테두리만 덮어쓰기 (기능 변경 없음) ---- */
-  .notice { background: var(--card); border: 2px solid var(--text); color: var(--text); }
-  input, select, textarea { border-color: #777; }
-  input:focus, select:focus, textarea:focus { outline: 3px solid var(--text); }
-  .btn { border-color: #777; }
-  .btn.danger { border-color: var(--bad); }
-  .pill { background: var(--card); color: var(--text); border: 1px solid #555; }
-  .pill.ok { background: var(--ok); color: var(--card); border-color: var(--ok); }
-  .pill.bad { background: var(--bad); color: var(--card); border-color: var(--bad); }
-  .pill.warn { background: var(--card); color: var(--text); border: 1px dashed var(--text); }
-  .pill.sev-high { background: var(--bad); color: var(--card); border-color: var(--bad); }
-  .pill.sev-mid { background: var(--primary); color: var(--card); border-color: var(--primary); }
-  .pill.sev-low { background: var(--card); color: var(--text); border-color: #555; }
-  .stat { background: var(--card); border: 1px solid #777; }
-  .stat.bad { border: 2px solid var(--bad); }
-  .stage-prog div { border-color: #777; }
-  .stage-prog div.done { background: var(--card); border: 2px solid var(--ok); color: var(--ok); font-weight: 700; }
-  .stage-prog div.has-bad { border: 3px solid var(--bad); }
-  details.stage, details.info-card, section.card { border-color: #777; }
-  .item.out { background: var(--card); box-shadow: inset 0 0 0 3px var(--bad); }
-  .item.out .meas input { border-width: 3px; }
-  .verdict.bad::before { content: "▲ "; }
-  .seg { border-color: #777; }
-  .seg button { color: #444; border-right-color: #777; }
-  .seg button[aria-pressed="true"][data-v="done"] { background: var(--ok); color: var(--card); font-weight: 700; }
-  .seg button[aria-pressed="true"][data-v="hold"] { background: var(--card); color: var(--text); font-weight: 700; outline: 2px dashed var(--text); outline-offset: -4px; }
-  .seg button[aria-pressed="true"][data-v="na"] { background: #555; color: var(--card); font-weight: 700; }
-  .issue { background: var(--card); border-color: #777; }
-  .toast { background: var(--primary); }
-  .notice.storage-alert { border: 3px solid var(--bad); }
-  /* 조건부 완료: 초록 테두리만(채움 없음) + 글자로 구분 */
-  .seg button[aria-pressed="true"][data-v="done"].cond { background: var(--card); color: var(--ok); font-weight: 700; outline: 2px solid var(--ok); outline-offset: -4px; }
-  .pill.cond { background: var(--card); color: var(--ok); border: 1px solid var(--ok); }
-  .cond-note { margin-top: 6px; font-size: 13px; color: var(--ok); font-weight: 600; }
 
   @media (max-width: 700px) {
     body { font-size: 15px; }
@@ -169,9 +158,16 @@
     body { background: #fff; }
     header.top, nav.tabs, .notice, #view-check, .no-print, footer, .toast { display: none !important; }
     #view-summary { display: block !important; }
+    #view-summary section.card > h2 { display: none; } /* "인수인계 요약 · 자동 생성" 제목줄은 인쇄하지 않음 */
     main { padding: 0; max-width: none; }
     section.card { border: 0; padding: 0; }
     .summary-sheet { border: 1px solid #000; }
+    /* 인쇄 시 배경색이 빠져도 보이도록 배지를 흰 바탕 + 진한 글씨·테두리로 */
+    .summary-sheet .pill { background: #fff; color: #000; border: 1px solid #000; }
+    .summary-sheet .pill.warn { border-style: dashed; }
+    .summary-sheet .pill.cond { color: #0b6b2e; border-color: #0b6b2e; }
+    .summary-sheet .pill.sev-high { color: #b00000; border: 2px solid #b00000; font-weight: 800; }
+    .summary-sheet .pill.sev-mid { border: 2px solid #000; font-weight: 800; }
   }
 </style>
 </head>
@@ -196,13 +192,13 @@
     입력 내용은 이 기기의 브라우저(localStorage)에만 저장되고 서버로 전송되지 않습니다.
   </div>
 
-  <nav class="tabs" role="tablist">
-    <button role="tab" id="tab-check" aria-selected="true" data-view="check">① 셋업 체크리스트</button>
-    <button role="tab" id="tab-summary" aria-selected="false" data-view="summary">② 인수인계 요약</button>
+  <nav class="tabs" role="tablist" aria-label="화면 선택">
+    <button role="tab" id="tab-check" aria-selected="true" aria-controls="view-check" tabindex="0" data-view="check">① 셋업 체크리스트</button>
+    <button role="tab" id="tab-summary" aria-selected="false" aria-controls="view-summary" tabindex="-1" data-view="summary">② 인수인계 요약</button>
   </nav>
 
   <!-- ===== 기능 1: 단계별 셋업 체크리스트 ===== -->
-  <div id="view-check">
+  <div id="view-check" role="tabpanel" aria-labelledby="tab-check">
     <details class="card info-card" id="infoCard">
       <summary>
         <span class="info-title">셋업 건 정보</span>
@@ -248,7 +244,7 @@
   </div>
 
   <!-- ===== 기능 2: 인수인계 요약 자동 생성 ===== -->
-  <div id="view-summary" class="hidden">
+  <div id="view-summary" class="hidden" role="tabpanel" aria-labelledby="tab-summary">
     <section class="card">
       <h2>인수인계 요약 <span class="pill">체크리스트 기록으로 자동 생성</span></h2>
       <div class="row-actions no-print" style="margin-bottom:12px">
@@ -495,6 +491,9 @@
     }).join('');
     $('#modelSelect').innerHTML = Object.entries(TEMPLATES).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join('');
     $('#modelSelect').value = cur().info.model; // 목록을 다시 그려도 저장된 모델 선택 유지
+    // 스크린 리더가 어떤 셋업 건을 지우는지 알 수 있도록
+    const ci = cur().info;
+    $('#delCase').setAttribute('aria-label', `현재 셋업 건 삭제: ${[ci.customer || '고객사 미입력', ci.site, ci.sn].filter(Boolean).join(' ')}`);
   }
 
   function renderInfoLine() {
@@ -519,6 +518,7 @@
     $('#stDoneLabel').textContent = p.cond ? `완료·해당 없음 (조건부 ${p.cond} 별도)` : '완료·해당 없음';
     $('#stHold').textContent = p.hold;
     $('#stOut').textContent = p.out;
+    $('#stOut').closest('.stat').classList.toggle('alert', p.out > 0); // 이탈이 있을 때만 빨간 표시
     $('#stageProg').innerHTML = p.stages.map(s =>
       `<div class="${s.done === s.total ? 'done' : ''} ${s.out ? 'has-bad' : ''}"><span>${esc(s.name)}</span><b>${s.done}/${s.total}${s.cond ? ` <span class="pill cond">조건부 ${s.cond}</span>` : ''}${s.out ? ` <span class="pill bad">이탈 ${s.out}</span>` : ''}</b></div>`
     ).join('');
@@ -549,8 +549,8 @@
       <div class="issue ${is.closed ? 'closed' : ''}" data-issue="${is.id}">
         <span class="pill sev-${is.sev}">${SEV_LABEL[is.sev]}</span>
         <span class="txt">${esc(is.text)}</span>
-        <button class="btn sm" data-act="toggleIssue">${is.closed ? '다시 열기' : '해결'}</button>
-        <button class="btn sm danger" data-act="delIssue" aria-label="이슈 삭제">삭제</button>
+        <button class="btn sm" data-act="toggleIssue" aria-label="${is.closed ? '이슈 다시 열기' : '이슈 해결'}: ${esc(is.text)}">${is.closed ? '다시 열기' : '해결'}</button>
+        <button class="btn sm danger" data-act="delIssue" aria-label="이슈 삭제: ${esc(is.text)}">삭제</button>
       </div>`).join('');
     return `
       <div class="item ${j === 'out' || j === 'invalid' ? 'out' : ''}" data-item="${it.id}">
@@ -559,14 +559,14 @@
           <span class="pill">${it.type === 'measure' ? '측정값' : '체크'}</span>
         </div>
         ${cond ? `<div class="cond-note">조건부 완료: ${judge(it, r.value) === 'out' ? '기준 이탈' : '측정값 없음'} 상태로 완료했어요. 진행률에는 포함되지 않고 요약에 따로 표시돼요.</div>` : ''}
-        <div class="seg" role="group" aria-label="상태">${seg}</div>
+        <div class="seg" role="group" aria-label="${esc(it.name)} 상태">${seg}</div>
         ${meas}
-        <textarea rows="2" data-act="memo" placeholder="메모 (보류 사유, 특이사항 등)">${esc(r.memo)}</textarea>
+        <textarea rows="2" data-act="memo" aria-label="${esc(it.name)} 메모" placeholder="메모 (보류 사유, 특이사항 등)">${esc(r.memo)}</textarea>
         <div class="issues">${issues}</div>
         <div class="issue-form">
-          <input data-issue-text placeholder="이슈 내용 입력">
-          <select data-issue-sev aria-label="심각도"><option value="high">심각도: 높음</option><option value="mid" selected>심각도: 중간</option><option value="low">심각도: 낮음</option></select>
-          <button class="btn sm" data-act="addIssue">이슈 등록</button>
+          <input data-issue-text aria-label="${esc(it.name)} 이슈 내용" placeholder="이슈 내용 입력">
+          <select data-issue-sev aria-label="${esc(it.name)} 이슈 심각도"><option value="high">심각도: 높음</option><option value="mid" selected>심각도: 중간</option><option value="low">심각도: 낮음</option></select>
+          <button class="btn sm" data-act="addIssue" aria-label="${esc(it.name)} 이슈 등록">이슈 등록</button>
         </div>
       </div>`;
   }
@@ -698,6 +698,8 @@
     $('#view-summary').classList.toggle('hidden', v !== 'summary');
     $('#tab-check').setAttribute('aria-selected', v === 'check');
     $('#tab-summary').setAttribute('aria-selected', v === 'summary');
+    $('#tab-check').tabIndex = v === 'check' ? 0 : -1;   // 선택된 탭만 Tab 키로 들어가고, 탭 사이는 화살표로 이동
+    $('#tab-summary').tabIndex = v === 'summary' ? 0 : -1;
     if (v === 'summary') renderSummary();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -707,6 +709,18 @@
 
   // ---------- 이벤트 ----------
   document.querySelectorAll('nav.tabs button').forEach(b => b.addEventListener('click', () => showView(b.dataset.view)));
+  // 탭 키보드 탐색: ← → Home End
+  $('nav.tabs').addEventListener('keydown', e => {
+    const tabsArr = [...document.querySelectorAll('nav.tabs [role="tab"]')];
+    const i = tabsArr.indexOf(document.activeElement); if (i < 0) return;
+    let n = null;
+    if (e.key === 'ArrowRight') n = (i + 1) % tabsArr.length;
+    else if (e.key === 'ArrowLeft') n = (i - 1 + tabsArr.length) % tabsArr.length;
+    else if (e.key === 'Home') n = 0;
+    else if (e.key === 'End') n = tabsArr.length - 1;
+    if (n === null) return;
+    e.preventDefault(); showView(tabsArr[n].dataset.view); tabsArr[n].focus();
+  });
   $('#makeSummary').addEventListener('click', () => showView('summary'));
   $('#refreshSummary').addEventListener('click', () => { renderSummary(); toast('요약을 다시 만들었습니다'); });
   $('#printSummary').addEventListener('click', () => window.print());
@@ -787,6 +801,7 @@
     save(); renderItem(itemEl.dataset.item); renderProgress();
   });
   stagesEl.addEventListener('keydown', e => {
+    if (e.isComposing || e.keyCode === 229) return; // 한글 조합 중인 Enter는 무시 (중복 등록 방지)
     if (e.key === 'Enter' && e.target.matches('[data-issue-text]')) { e.preventDefault(); e.target.closest('[data-item]').querySelector('[data-act="addIssue"]').click(); }
   });
   stagesEl.addEventListener('input', e => {
